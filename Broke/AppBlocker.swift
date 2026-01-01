@@ -16,9 +16,11 @@ class AppBlocker: ObservableObject {
     
     private var usageTimer: Timer?
     private var currentProfileId: UUID?
+    private var blockingStartTime: Date?
     
     init() {
         loadBlockingState()
+        loadBlockingStartTime()
         Task {
             await requestAuthorization()
         }
@@ -27,6 +29,8 @@ class AppBlocker: ObservableObject {
     // Call this from BrokerView's onAppear to restore usage tracking if blocking
     func restoreUsageTrackingIfNeeded(for profile: Profile, profileManager: ProfileManager) {
         if isBlocking {
+            // Add any elapsed time since last app open
+            addElapsedUsageTime(for: profile.id, profileManager: profileManager)
             startUsageTracking(for: profile.id, profileManager: profileManager)
             NSLog("Restored usage tracking for profile: \(profile.name)")
         }
@@ -62,8 +66,14 @@ class AppBlocker: ObservableObject {
         saveBlockingState()
         
         if isBlocking {
+            blockingStartTime = Date()
+            saveBlockingStartTime()
             startUsageTracking(for: profile.id, profileManager: profileManager)
         } else {
+            // Add final elapsed time before stopping
+            addElapsedUsageTime(for: profile.id, profileManager: profileManager)
+            blockingStartTime = nil
+            clearBlockingStartTime()
             stopUsageTracking()
         }
         
@@ -81,6 +91,20 @@ class AppBlocker: ObservableObject {
         }
     }
     
+    private func addElapsedUsageTime(for profileId: UUID, profileManager: ProfileManager) {
+        guard let startTime = blockingStartTime else { return }
+        
+        let elapsed = Date().timeIntervalSince(startTime)
+        let elapsedMinutes = Int(elapsed / 60)
+        
+        if elapsedMinutes > 0 {
+            profileManager.addUsageTime(minutes: elapsedMinutes, for: profileId)
+            // Reset start time to now
+            blockingStartTime = Date()
+            saveBlockingStartTime()
+        }
+    }
+    
     private func startUsageTracking(for profileId: UUID, profileManager: ProfileManager) {
         stopUsageTracking() // Stop any existing timer
         
@@ -91,7 +115,7 @@ class AppBlocker: ObservableObject {
             guard let self = self, let profileManager = profileManager else { return }
             
             if self.isBlocking, let currentId = self.currentProfileId {
-                profileManager.addUsageTime(minutes: 1, for: currentId)
+                self.addElapsedUsageTime(for: currentId, profileManager: profileManager)
                 
                 // Check if limit is reached
                 if profileManager.hasCurrentProfileReachedLimit() {
@@ -117,6 +141,22 @@ class AppBlocker: ObservableObject {
     
     private func saveBlockingState() {
         UserDefaults.standard.set(isBlocking, forKey: "isBlocking")
+    }
+    
+    private func loadBlockingStartTime() {
+        if let timestamp = UserDefaults.standard.object(forKey: "blockingStartTime") as? Date {
+            blockingStartTime = timestamp
+        }
+    }
+    
+    private func saveBlockingStartTime() {
+        if let startTime = blockingStartTime {
+            UserDefaults.standard.set(startTime, forKey: "blockingStartTime")
+        }
+    }
+    
+    private func clearBlockingStartTime() {
+        UserDefaults.standard.removeObject(forKey: "blockingStartTime")
     }
     
     deinit {

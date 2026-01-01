@@ -207,10 +207,13 @@ class ProfileManager: ObservableObject {
     func unlockForNextDay(profileId: UUID) {
         guard let index = profiles.firstIndex(where: { $0.id == profileId }) else { return }
         
-        // Set the last reset date to tomorrow, so usage won't reset until then
+        // Set usage to 0 and last reset date to start of tomorrow
+        // This way, tomorrow the quota will be available
         let calendar = Calendar.current
-        if let tomorrow = calendar.date(byAdding: .day, value: 1, to: Date()) {
-            profiles[index].lastResetDate = tomorrow
+        if let tomorrow = calendar.date(byAdding: .day, value: 1, to: Date()),
+           let startOfTomorrow = calendar.startOfDay(for: tomorrow) as Date? {
+            profiles[index].usageMinutes = 0
+            profiles[index].lastResetDate = startOfTomorrow
             saveProfiles()
             NSLog("Unlocked quota for next day for profile: \(profiles[index].name)")
         }
