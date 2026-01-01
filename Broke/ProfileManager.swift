@@ -204,19 +204,19 @@ class ProfileManager: ObservableObject {
         NSLog("Added \(minutes) minutes to profile \(profiles[index].name). Total: \(profiles[index].usageMinutes)")
     }
     
-    // Unlock quota for the next day only (doesn't reset current day usage)
-    func unlockForNextDay(profileId: UUID) {
+    // Unlock by borrowing from tomorrow's quota
+    // Any additional usage today will deplete tomorrow's quota
+    func unlockUsingTomorrowQuota(profileId: UUID) {
         guard let index = profiles.firstIndex(where: { $0.id == profileId }) else { return }
         
-        // Set usage to 0 and last reset date to start of tomorrow
-        // This way, tomorrow the quota will be available
+        // Set last reset date to tomorrow so usage won't reset until the day after
+        // Current usage continues to accumulate and will carry over as tomorrow's usage
         let calendar = Calendar.current
         if let tomorrow = calendar.date(byAdding: .day, value: 1, to: Date()),
            let startOfTomorrow = calendar.startOfDay(for: tomorrow) {
-            profiles[index].usageMinutes = 0
             profiles[index].lastResetDate = startOfTomorrow
             saveProfiles()
-            NSLog("Unlocked quota for next day for profile: \(profiles[index].name)")
+            NSLog("Unlocked using tomorrow's quota for profile: \(profiles[index].name). Current usage: \(profiles[index].usageMinutes) minutes will count against tomorrow.")
         }
     }
     
@@ -244,6 +244,18 @@ struct Profile: Identifiable, Codable {
     var isLimitReached: Bool {
         guard let limit = dailyLimitMinutes else { return false }
         return usageMinutes >= limit
+    }
+    
+    var isTomorrowQuotaExhausted: Bool {
+        guard let limit = dailyLimitMinutes else { return false }
+        // Tomorrow's quota is exhausted if usage >= 2x the daily limit
+        return usageMinutes >= (limit * 2)
+    }
+    
+    var canUnlockUsingTomorrowQuota: Bool {
+        guard let limit = dailyLimitMinutes else { return false }
+        // Can only unlock if today's limit is reached but tomorrow's isn't exhausted yet
+        return usageMinutes >= limit && usageMinutes < (limit * 2)
     }
 
     // New initializer to support default icon

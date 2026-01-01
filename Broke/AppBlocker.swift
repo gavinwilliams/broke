@@ -59,12 +59,6 @@ class AppBlocker: ObservableObject {
             return
         }
         
-        // Check if trying to unblock but limit is reached
-        if isBlocking && profile.isLimitReached {
-            NSLog("Cannot unlock - daily limit reached. Use unlock for next day instead.")
-            return
-        }
-        
         isBlocking.toggle()
         saveBlockingState()
         

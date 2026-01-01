@@ -27,6 +27,11 @@ struct ProfileFormView: View {
         return !profileName.isEmpty && (!hasDailyLimit || (dailyLimitHours > 0 || dailyLimitMinutes > 0))
     }
     
+    private var hasActiveUsage: Bool {
+        guard let profile = profile else { return false }
+        return profile.usageMinutes > 0
+    }
+    
     init(profile: Profile? = nil, profileManager: ProfileManager, onDismiss: @escaping () -> Void) {
         self.profile = profile
         self.profileManager = profileManager
@@ -73,6 +78,13 @@ struct ProfileFormView: View {
                 
                 Section(header: Text("Daily Limit")) {
                     Toggle("Enable Daily Limit", isOn: $hasDailyLimit)
+                        .disabled(hasActiveUsage)
+                    
+                    if hasActiveUsage {
+                        Text("Daily limit cannot be changed while there is active usage. Quota can only be modified on the following day when usage resets.")
+                            .font(.caption)
+                            .foregroundColor(.orange)
+                    }
                     
                     if hasDailyLimit {
                         HStack {
@@ -86,6 +98,7 @@ struct ProfileFormView: View {
                             .pickerStyle(.wheel)
                             .frame(width: 80, height: 100)
                             .clipped()
+                            .disabled(hasActiveUsage)
                         }
                         
                         HStack {
@@ -99,6 +112,7 @@ struct ProfileFormView: View {
                             .pickerStyle(.wheel)
                             .frame(width: 80, height: 100)
                             .clipped()
+                            .disabled(hasActiveUsage)
                         }
                         
                         if dailyLimitHours == 0 && dailyLimitMinutes == 0 {
@@ -107,7 +121,7 @@ struct ProfileFormView: View {
                                 .foregroundColor(.red)
                         }
                         
-                        Text("Once the daily limit is reached, apps will be blocked. Unlocking will only work for the next day.")
+                        Text("Once the daily limit is reached, you can unlock immediately but it will consume tomorrow's quota. If both quotas are exhausted, apps remain blocked until the day after tomorrow.")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
