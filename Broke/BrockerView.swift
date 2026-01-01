@@ -76,6 +76,13 @@ struct BrokerView: View {
             } message: {
                 Text("You've reached your daily limit. You can unlock the quota for tomorrow, but apps will remain blocked for today.")
             }
+            .onAppear {
+                // Check for daily reset on app start
+                profileManager.checkAndResetDailyUsage(for: currentProfile.id)
+                
+                // Restore usage tracking if app was already blocking
+                appBlocker.restoreUsageTrackingIfNeeded(for: currentProfile, profileManager: profileManager)
+            }
         }
         .animation(.spring(), value: isBlocking)
     }

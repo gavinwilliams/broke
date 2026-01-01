@@ -126,7 +126,7 @@ class ProfileManager: ObservableObject {
         appTokens: Set<ApplicationToken>? = nil,
         categoryTokens: Set<ActivityCategoryToken>? = nil,
         icon: String? = nil,
-        dailyLimitMinutes: Int? = nil
+        dailyLimitMinutes: Int?? = nil
     ) {
         if let index = profiles.firstIndex(where: { $0.id == id }) {
             if let name = name {
@@ -141,8 +141,8 @@ class ProfileManager: ObservableObject {
             if let icon = icon {
                 profiles[index].icon = icon
             }
-            if dailyLimitMinutes != nil {
-                profiles[index].dailyLimitMinutes = dailyLimitMinutes
+            if let limitValue = dailyLimitMinutes {
+                profiles[index].dailyLimitMinutes = limitValue
             }
             
             if currentProfileId == id {

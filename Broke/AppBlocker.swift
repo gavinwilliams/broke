@@ -24,6 +24,14 @@ class AppBlocker: ObservableObject {
         }
     }
     
+    // Call this from BrokerView's onAppear to restore usage tracking if blocking
+    func restoreUsageTrackingIfNeeded(for profile: Profile, profileManager: ProfileManager) {
+        if isBlocking {
+            startUsageTracking(for: profile.id, profileManager: profileManager)
+            NSLog("Restored usage tracking for profile: \(profile.name)")
+        }
+    }
+    
     func requestAuthorization() async {
         do {
             try await AuthorizationCenter.shared.requestAuthorization(for: .individual)
