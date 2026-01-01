@@ -42,3 +42,27 @@ To use Broke, follow these steps:
 * Clone the repository.
 * Open the project in Xcode.
 * Build and run the app on your iOS device.
+
+## Development
+
+### Building and Testing
+This project includes automated tests and continuous integration via GitHub Actions.
+
+#### Running Tests Locally
+1. Open `Broke.xcodeproj` in Xcode
+2. Select the `Broke` scheme
+3. Press `Cmd+U` or select `Product > Test` from the menu
+4. Tests will run on the iOS Simulator
+
+#### Continuous Integration
+The project uses GitHub Actions to automatically:
+* Build the app on every push and pull request
+* Run all unit tests
+* Verify that the app compiles successfully
+
+The CI workflow runs on macOS with the latest stable version of Xcode and tests on iOS Simulator.
+
+### Test Coverage
+The test suite includes:
+* **Profile Tests**: Tests for profile creation, configuration, and usage tracking
+* **ProfileManager Tests**: Tests for profile management, persistence, and daily usage limits
