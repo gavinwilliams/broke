@@ -2,8 +2,6 @@
 //  ProfileTests.swift
 //  BrokeTests
 //
-//  Created by GitHub Copilot on 01/01/2026.
-//
 
 import XCTest
 import FamilyControls
