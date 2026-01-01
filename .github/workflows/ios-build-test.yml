@@ -1,0 +1,47 @@
+name: iOS Build and Test
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-and-test:
+    name: Build and Test
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Xcode
+      uses: maxim-lobanov/setup-xcode@v1
+      with:
+        xcode-version: latest-stable
+        
+    - name: Show Xcode version
+      run: xcodebuild -version
+      
+    - name: Show available simulators
+      run: xcrun simctl list devicetypes
+      
+    - name: Build App
+      run: |
+        xcodebuild clean build \
+          -project Broke.xcodeproj \
+          -scheme Broke \
+          -destination 'platform=iOS Simulator,name=iPhone 15,OS=latest' \
+          CODE_SIGN_IDENTITY="" \
+          CODE_SIGNING_REQUIRED=NO \
+          | xcpretty || exit 1
+          
+    - name: Run Tests
+      run: |
+        xcodebuild test \
+          -project Broke.xcodeproj \
+          -scheme Broke \
+          -destination 'platform=iOS Simulator,name=iPhone 15,OS=latest' \
+          CODE_SIGN_IDENTITY="" \
+          CODE_SIGNING_REQUIRED=NO \
+          | xcpretty || exit 1
