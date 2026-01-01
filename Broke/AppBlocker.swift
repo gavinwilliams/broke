@@ -159,6 +159,7 @@ class AppBlocker: ObservableObject {
     private func checkAndSendNotifications(for profile: Profile) {
         let percentage = profile.usagePercentage
         let now = Date()
+        let notificationKey = "notification-\(profile.id.uuidString)"
         
         // Check if we should send a notification
         if profile.shouldNotifyUsageWarning {
@@ -173,17 +174,23 @@ class AppBlocker: ObservableObject {
             lastNotificationCheck[profile.id] = now
         }
         
-        // Send notification when limit is reached
+        // Send notification when limit is reached (allow repeated notifications every 10 minutes)
         if profile.isLimitReached && !profile.isTomorrowQuotaExhausted {
-            if lastNotificationCheck[profile.id] == nil {
+            let lastLimitNotification = lastNotificationCheck[profile.id]
+            let shouldNotify = lastLimitNotification == nil || now.timeIntervalSince(lastLimitNotification!) > 600 // 10 minutes
+            
+            if shouldNotify {
                 notificationManager.scheduleLimitReachedNotification(for: profile)
                 lastNotificationCheck[profile.id] = now
             }
         }
         
-        // Send notification when both quotas are exhausted
+        // Send notification when both quotas are exhausted (allow repeated notifications every 15 minutes)
         if profile.isTomorrowQuotaExhausted {
-            if lastNotificationCheck[profile.id] == nil {
+            let lastExhaustedNotification = lastNotificationCheck[profile.id]
+            let shouldNotify = lastExhaustedNotification == nil || now.timeIntervalSince(lastExhaustedNotification!) > 900 // 15 minutes
+            
+            if shouldNotify {
                 notificationManager.scheduleBothQuotasExhaustedNotification(for: profile)
                 lastNotificationCheck[profile.id] = now
             }

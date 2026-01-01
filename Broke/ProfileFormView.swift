@@ -119,9 +119,25 @@ struct ProfileFormView: View {
                             .foregroundColor(.red)
                     }
                     
-                    Text("When Broke is activated, ALL profiles are monitored simultaneously. Once a profile's daily limit is reached, you can unlock immediately but it will consume tomorrow's quota. You'll receive notifications when usage is running out.")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("How it works:")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.secondary)
+                        Text("• When Broke is activated, ALL profiles are monitored simultaneously")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text("• When a profile's daily limit is reached, you can unlock immediately")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text("• Unlocking consumes tomorrow's quota for that profile")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text("• You'll receive notifications when usage is running out")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.vertical, 4)
                 }
                 
                 Section(header: Text("App Configuration")) {
