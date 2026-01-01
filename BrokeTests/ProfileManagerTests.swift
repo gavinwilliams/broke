@@ -4,7 +4,6 @@
 //
 
 import XCTest
-import FamilyControls
 @testable import Broke
 
 final class ProfileManagerTests: XCTestCase {
