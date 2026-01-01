@@ -40,10 +40,10 @@ struct ProfileFormView: View {
         _activitySelection = State(initialValue: selection)
         
         // Initialize daily limit states
-        let limitMinutes = profile?.dailyLimitMinutes ?? 0
-        _hasDailyLimit = State(initialValue: limitMinutes > 0)
-        _dailyLimitHours = State(initialValue: limitMinutes / 60)
-        _dailyLimitMinutes = State(initialValue: limitMinutes % 60)
+        let limitMinutes = profile?.dailyLimitMinutes
+        _hasDailyLimit = State(initialValue: limitMinutes != nil && limitMinutes! > 0)
+        _dailyLimitHours = State(initialValue: (limitMinutes ?? 0) / 60)
+        _dailyLimitMinutes = State(initialValue: (limitMinutes ?? 0) % 60)
     }
     
     var body: some View {
@@ -181,8 +181,15 @@ struct ProfileFormView: View {
     }
     
     private func handleSave() {
-        let totalMinutes = hasDailyLimit ? (dailyLimitHours * 60 + dailyLimitMinutes) : 0
-        let limitValue: Int? = hasDailyLimit ? totalMinutes : nil
+        // Calculate limit value: nil if no limit, otherwise total minutes
+        let limitValue: Int?
+        if hasDailyLimit {
+            let totalMinutes = dailyLimitHours * 60 + dailyLimitMinutes
+            // Validation ensures this is > 0, but be explicit
+            limitValue = totalMinutes > 0 ? totalMinutes : nil
+        } else {
+            limitValue = nil
+        }
         
         if let existingProfile = profile {
             profileManager.updateProfile(

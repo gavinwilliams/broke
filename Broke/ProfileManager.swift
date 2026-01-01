@@ -212,7 +212,7 @@ class ProfileManager: ObservableObject {
         // This way, tomorrow the quota will be available
         let calendar = Calendar.current
         if let tomorrow = calendar.date(byAdding: .day, value: 1, to: Date()),
-           let startOfTomorrow = calendar.startOfDay(for: tomorrow) as Date? {
+           let startOfTomorrow = calendar.startOfDay(for: tomorrow) {
             profiles[index].usageMinutes = 0
             profiles[index].lastResetDate = startOfTomorrow
             saveProfiles()

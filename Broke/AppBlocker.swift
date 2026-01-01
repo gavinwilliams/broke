@@ -114,8 +114,15 @@ class AppBlocker: ObservableObject {
         currentProfileId = profileId
         
         // Track usage every minute
-        usageTimer = Timer.scheduledTimer(withTimeInterval: usageTrackingInterval, repeats: true) { [weak self, weak profileManager] _ in
-            guard let self = self, let profileManager = profileManager else { return }
+        usageTimer = Timer.scheduledTimer(withTimeInterval: usageTrackingInterval, repeats: true) { [weak self, weak profileManager] timer in
+            guard let self = self else { 
+                timer.invalidate()
+                return 
+            }
+            guard let profileManager = profileManager else {
+                self.stopUsageTracking()
+                return
+            }
             
             if self.isBlocking, let currentId = self.currentProfileId {
                 self.addElapsedUsageTime(for: currentId, profileManager: profileManager)
