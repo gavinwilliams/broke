@@ -17,6 +17,9 @@ struct ProfileFormView: View {
     @State private var showAppSelection = false
     @State private var activitySelection: FamilyActivitySelection
     @State private var showDeleteConfirmation = false
+    @State private var hasDailyLimit: Bool
+    @State private var dailyLimitHours: Int
+    @State private var dailyLimitMinutes: Int
     let profile: Profile?
     let onDismiss: () -> Void
     
@@ -31,6 +34,12 @@ struct ProfileFormView: View {
         selection.applicationTokens = profile?.appTokens ?? []
         selection.categoryTokens = profile?.categoryTokens ?? []
         _activitySelection = State(initialValue: selection)
+        
+        // Initialize daily limit states
+        let limitMinutes = profile?.dailyLimitMinutes ?? 0
+        _hasDailyLimit = State(initialValue: limitMinutes > 0)
+        _dailyLimitHours = State(initialValue: limitMinutes / 60)
+        _dailyLimitMinutes = State(initialValue: limitMinutes % 60)
     }
     
     var body: some View {
@@ -55,6 +64,48 @@ struct ProfileFormView: View {
                             Image(systemName: "chevron.right")
                                 .foregroundColor(.secondary)
                         }
+                    }
+                }
+                
+                Section(header: Text("Daily Limit")) {
+                    Toggle("Enable Daily Limit", isOn: $hasDailyLimit)
+                    
+                    if hasDailyLimit {
+                        HStack {
+                            Text("Hours:")
+                            Spacer()
+                            Picker("Hours", selection: $dailyLimitHours) {
+                                ForEach(0..<24) { hour in
+                                    Text("\(hour)").tag(hour)
+                                }
+                            }
+                            .pickerStyle(.wheel)
+                            .frame(width: 80, height: 100)
+                            .clipped()
+                        }
+                        
+                        HStack {
+                            Text("Minutes:")
+                            Spacer()
+                            Picker("Minutes", selection: $dailyLimitMinutes) {
+                                ForEach(0..<60) { minute in
+                                    Text("\(minute)").tag(minute)
+                                }
+                            }
+                            .pickerStyle(.wheel)
+                            .frame(width: 80, height: 100)
+                            .clipped()
+                        }
+                        
+                        if dailyLimitHours == 0 && dailyLimitMinutes == 0 {
+                            Text("Please set a limit greater than 0")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        }
+                        
+                        Text("Once the daily limit is reached, apps will be blocked. Unlocking will only work for the next day.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                     }
                 }
                 
@@ -95,7 +146,7 @@ struct ProfileFormView: View {
             .navigationBarItems(
                 leading: Button("Cancel", action: onDismiss),
                 trailing: Button("Save", action: handleSave)
-                    .disabled(profileName.isEmpty)
+                    .disabled(profileName.isEmpty || (hasDailyLimit && dailyLimitHours == 0 && dailyLimitMinutes == 0))
             )
             .sheet(isPresented: $showSymbolsPicker) {
                 SymbolsPicker(selection: $profileIcon, title: "Pick an icon", autoDismiss: true)
@@ -126,20 +177,25 @@ struct ProfileFormView: View {
     }
     
     private func handleSave() {
+        let totalMinutes = hasDailyLimit ? (dailyLimitHours * 60 + dailyLimitMinutes) : 0
+        let limitValue: Int? = hasDailyLimit ? totalMinutes : nil
+        
         if let existingProfile = profile {
             profileManager.updateProfile(
                 id: existingProfile.id,
                 name: profileName,
                 appTokens: activitySelection.applicationTokens,
                 categoryTokens: activitySelection.categoryTokens,
-                icon: profileIcon
+                icon: profileIcon,
+                dailyLimitMinutes: limitValue
             )
         } else {
             let newProfile = Profile(
                 name: profileName,
                 appTokens: activitySelection.applicationTokens,
                 categoryTokens: activitySelection.categoryTokens,
-                icon: profileIcon
+                icon: profileIcon,
+                dailyLimitMinutes: limitValue
             )
             profileManager.addProfile(newProfile: newProfile)
         }

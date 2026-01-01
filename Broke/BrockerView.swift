@@ -19,11 +19,16 @@ struct BrokerView: View {
     @State private var showWrongTagAlert = false
     @State private var showCreateTagAlert = false
     @State private var nfcWriteSuccess = false
+    @State private var showLimitReachedAlert = false
     
     private var isBlocking : Bool {
         get {
             return appBlocker.isBlocking
         }
+    }
+    
+    private var currentProfile: Profile {
+        profileManager.currentProfile
     }
     
     var body: some View {
@@ -63,6 +68,14 @@ struct BrokerView: View {
             } message: {
                 Text(nfcWriteSuccess ? "Broker tag created successfully!" : "Failed to create Broker tag. Please try again.")
             }
+            .alert("Daily Limit Reached", isPresented: $showLimitReachedAlert) {
+                Button("Unlock for Tomorrow") {
+                    unlockForNextDay()
+                }
+                Button("Cancel", role: .cancel) { }
+            } message: {
+                Text("You've reached your daily limit. You can unlock the quota for tomorrow, but apps will remain blocked for today.")
+            }
         }
         .animation(.spring(), value: isBlocking)
     }
@@ -70,7 +83,15 @@ struct BrokerView: View {
     @ViewBuilder
     private func blockOrUnblockButton(geometry: GeometryProxy) -> some View {
         VStack(spacing: 8) {
-            Text(isBlocking ? "Tap to unblock" : "Tap to block")
+            // Show usage info if daily limit is set
+            if let limit = currentProfile.dailyLimitMinutes {
+                Text("\(currentProfile.usageMinutes) / \(limit) minutes")
+                    .font(.caption)
+                    .opacity(0.75)
+                    .transition(.scale)
+            }
+            
+            Text(isBlocking ? (currentProfile.isLimitReached ? "Tap to unlock for tomorrow" : "Tap to unblock") : "Tap to block")
                 .font(.caption)
                 .opacity(0.75)
                 .transition(.scale)
@@ -96,12 +117,24 @@ struct BrokerView: View {
         nfcReader.scan { payload in
             if payload == tagPhrase {
                 NSLog("Toggling block")
-                appBlocker.toggleBlocking(for: profileManager.currentProfile)
+                
+                // Check if limit is reached and trying to unblock
+                if appBlocker.isBlocking && currentProfile.isLimitReached {
+                    showLimitReachedAlert = true
+                } else {
+                    appBlocker.toggleBlocking(for: profileManager.currentProfile, profileManager: profileManager)
+                }
             } else {
                 showWrongTagAlert = true
                 NSLog("Wrong Tag!\nPayload: \(payload)")
             }
         }
+    }
+    
+    private func unlockForNextDay() {
+        profileManager.unlockForNextDay(profileId: currentProfile.id)
+        // Apps remain blocked for today
+        NSLog("Unlocked for tomorrow - apps remain blocked today")
     }
     
     private var createTagButton: some View {

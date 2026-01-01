@@ -125,7 +125,8 @@ class ProfileManager: ObservableObject {
         name: String? = nil,
         appTokens: Set<ApplicationToken>? = nil,
         categoryTokens: Set<ActivityCategoryToken>? = nil,
-        icon: String? = nil
+        icon: String? = nil,
+        dailyLimitMinutes: Int? = nil
     ) {
         if let index = profiles.firstIndex(where: { $0.id == id }) {
             if let name = name {
@@ -139,6 +140,9 @@ class ProfileManager: ObservableObject {
             }
             if let icon = icon {
                 profiles[index].icon = icon
+            }
+            if dailyLimitMinutes != nil {
+                profiles[index].dailyLimitMinutes = dailyLimitMinutes
             }
             
             if currentProfileId == id {
@@ -164,6 +168,59 @@ class ProfileManager: ObservableObject {
             saveProfiles()
         }
     }
+    
+    // Check if it's a new day and reset usage if needed
+    func checkAndResetDailyUsage(for profileId: UUID) {
+        guard let index = profiles.firstIndex(where: { $0.id == profileId }) else { return }
+        
+        let calendar = Calendar.current
+        let now = Date()
+        
+        if let lastReset = profiles[index].lastResetDate {
+            // Check if it's a new day
+            if !calendar.isDate(lastReset, inSameDayAs: now) {
+                profiles[index].usageMinutes = 0
+                profiles[index].lastResetDate = now
+                saveProfiles()
+                NSLog("Daily usage reset for profile: \(profiles[index].name)")
+            }
+        } else {
+            // First time tracking, set the reset date
+            profiles[index].lastResetDate = now
+            saveProfiles()
+        }
+    }
+    
+    // Add usage time (in minutes) to current profile
+    func addUsageTime(minutes: Int, for profileId: UUID) {
+        guard let index = profiles.firstIndex(where: { $0.id == profileId }) else { return }
+        
+        // Check for daily reset first
+        checkAndResetDailyUsage(for: profileId)
+        
+        profiles[index].usageMinutes += minutes
+        saveProfiles()
+        NSLog("Added \(minutes) minutes to profile \(profiles[index].name). Total: \(profiles[index].usageMinutes)")
+    }
+    
+    // Unlock quota for the next day only (doesn't reset current day usage)
+    func unlockForNextDay(profileId: UUID) {
+        guard let index = profiles.firstIndex(where: { $0.id == profileId }) else { return }
+        
+        // Set the last reset date to tomorrow, so usage won't reset until then
+        let calendar = Calendar.current
+        if let tomorrow = calendar.date(byAdding: .day, value: 1, to: Date()) {
+            profiles[index].lastResetDate = tomorrow
+            saveProfiles()
+            NSLog("Unlocked quota for next day for profile: \(profiles[index].name)")
+        }
+    }
+    
+    // Check if current profile has reached its daily limit
+    func hasCurrentProfileReachedLimit() -> Bool {
+        checkAndResetDailyUsage(for: currentProfile.id)
+        return currentProfile.isLimitReached
+    }
 }
 
 struct Profile: Identifiable, Codable {
@@ -172,17 +229,28 @@ struct Profile: Identifiable, Codable {
     var appTokens: Set<ApplicationToken>
     var categoryTokens: Set<ActivityCategoryToken>
     var icon: String // New property for icon
+    var dailyLimitMinutes: Int? // Daily usage limit in minutes (nil = no limit)
+    var usageMinutes: Int // Current day usage in minutes
+    var lastResetDate: Date? // Last date when usage was reset
 
     var isDefault: Bool {
         name == "Default"
     }
+    
+    var isLimitReached: Bool {
+        guard let limit = dailyLimitMinutes else { return false }
+        return usageMinutes >= limit
+    }
 
     // New initializer to support default icon
-    init(name: String, appTokens: Set<ApplicationToken>, categoryTokens: Set<ActivityCategoryToken>, icon: String = "bell.slash") {
+    init(name: String, appTokens: Set<ApplicationToken>, categoryTokens: Set<ActivityCategoryToken>, icon: String = "bell.slash", dailyLimitMinutes: Int? = nil) {
         self.id = UUID()
         self.name = name
         self.appTokens = appTokens
         self.categoryTokens = categoryTokens
         self.icon = icon
+        self.dailyLimitMinutes = dailyLimitMinutes
+        self.usageMinutes = 0
+        self.lastResetDate = nil
     }
 }

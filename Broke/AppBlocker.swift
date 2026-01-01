@@ -7,11 +7,15 @@
 import SwiftUI
 import ManagedSettings
 import FamilyControls
+import Combine
 
 class AppBlocker: ObservableObject {
     let store = ManagedSettingsStore()
     @Published var isBlocking = false
     @Published var isAuthorized = false
+    
+    private var usageTimer: Timer?
+    private var currentProfileId: UUID?
     
     init() {
         loadBlockingState()
@@ -34,14 +38,27 @@ class AppBlocker: ObservableObject {
         }
     }
     
-    func toggleBlocking(for profile: Profile) {
+    func toggleBlocking(for profile: Profile, profileManager: ProfileManager, isUnlockingForNextDay: Bool = false) {
         guard isAuthorized else {
             print("Not authorized to block apps")
             return
         }
         
+        // Check if trying to unblock but limit is reached
+        if isBlocking && profile.isLimitReached && !isUnlockingForNextDay {
+            NSLog("Cannot unlock - daily limit reached. Use unlock for next day instead.")
+            return
+        }
+        
         isBlocking.toggle()
         saveBlockingState()
+        
+        if isBlocking {
+            startUsageTracking(for: profile.id, profileManager: profileManager)
+        } else {
+            stopUsageTracking()
+        }
+        
         applyBlockingSettings(for: profile)
     }
     
@@ -56,11 +73,45 @@ class AppBlocker: ObservableObject {
         }
     }
     
+    private func startUsageTracking(for profileId: UUID, profileManager: ProfileManager) {
+        stopUsageTracking() // Stop any existing timer
+        
+        currentProfileId = profileId
+        
+        // Track usage every minute
+        usageTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self, weak profileManager] _ in
+            guard let self = self, let profileManager = profileManager else { return }
+            
+            if self.isBlocking, let currentId = self.currentProfileId {
+                profileManager.addUsageTime(minutes: 1, for: currentId)
+                
+                // Check if limit is reached
+                if profileManager.hasCurrentProfileReachedLimit() {
+                    NSLog("Daily limit reached! Auto-blocking...")
+                    DispatchQueue.main.async {
+                        // Keep blocking but notify that limit is reached
+                        self.applyBlockingSettings(for: profileManager.currentProfile)
+                    }
+                }
+            }
+        }
+    }
+    
+    private func stopUsageTracking() {
+        usageTimer?.invalidate()
+        usageTimer = nil
+        currentProfileId = nil
+    }
+    
     private func loadBlockingState() {
         isBlocking = UserDefaults.standard.bool(forKey: "isBlocking")
     }
     
     private func saveBlockingState() {
         UserDefaults.standard.set(isBlocking, forKey: "isBlocking")
+    }
+    
+    deinit {
+        stopUsageTracking()
     }
 }
