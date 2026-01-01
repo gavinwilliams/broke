@@ -126,7 +126,7 @@ class ProfileManager: ObservableObject {
         appTokens: Set<ApplicationToken>? = nil,
         categoryTokens: Set<ActivityCategoryToken>? = nil,
         icon: String? = nil,
-        dailyLimitMinutes: Int?? = nil
+        dailyLimitMinutes: Int? = nil
     ) {
         if let index = profiles.firstIndex(where: { $0.id == id }) {
             if let name = name {
@@ -141,9 +141,8 @@ class ProfileManager: ObservableObject {
             if let icon = icon {
                 profiles[index].icon = icon
             }
-            // Double optional: nil means "don't change", .some(nil) means "set to nil", .some(value) means "set to value"
-            if let limitUpdate = dailyLimitMinutes {
-                profiles[index].dailyLimitMinutes = limitUpdate
+            if let limitMinutes = dailyLimitMinutes {
+                profiles[index].dailyLimitMinutes = limitMinutes
             }
             
             if currentProfileId == id {
@@ -233,7 +232,7 @@ struct Profile: Identifiable, Codable {
     var appTokens: Set<ApplicationToken>
     var categoryTokens: Set<ActivityCategoryToken>
     var icon: String // New property for icon
-    var dailyLimitMinutes: Int? // Daily usage limit in minutes (nil = no limit)
+    var dailyLimitMinutes: Int // Daily usage limit in minutes (MANDATORY - all profiles must have a limit)
     var usageMinutes: Int // Current day usage in minutes
     var lastResetDate: Date? // Last date when usage was reset
 
@@ -242,24 +241,31 @@ struct Profile: Identifiable, Codable {
     }
     
     var isLimitReached: Bool {
-        guard let limit = dailyLimitMinutes else { return false }
-        return usageMinutes >= limit
+        return usageMinutes >= dailyLimitMinutes
     }
     
     var isTomorrowQuotaExhausted: Bool {
-        guard let limit = dailyLimitMinutes else { return false }
         // Tomorrow's quota is exhausted if usage >= 2x the daily limit
-        return usageMinutes >= (limit * 2)
+        return usageMinutes >= (dailyLimitMinutes * 2)
     }
     
     var canUnlockUsingTomorrowQuota: Bool {
-        guard let limit = dailyLimitMinutes else { return false }
         // Can only unlock if today's limit is reached but tomorrow's isn't exhausted yet
-        return usageMinutes >= limit && usageMinutes < (limit * 2)
+        return usageMinutes >= dailyLimitMinutes && usageMinutes < (dailyLimitMinutes * 2)
+    }
+    
+    var usagePercentage: Double {
+        return Double(usageMinutes) / Double(dailyLimitMinutes)
+    }
+    
+    var shouldNotifyUsageWarning: Bool {
+        // Notify when 80% or 90% of quota is used
+        let percentage = usagePercentage
+        return percentage >= 0.8 && percentage < 1.0
     }
 
-    // New initializer to support default icon
-    init(name: String, appTokens: Set<ApplicationToken>, categoryTokens: Set<ActivityCategoryToken>, icon: String = "bell.slash", dailyLimitMinutes: Int? = nil) {
+    // New initializer with mandatory limit
+    init(name: String, appTokens: Set<ApplicationToken>, categoryTokens: Set<ActivityCategoryToken>, icon: String = "bell.slash", dailyLimitMinutes: Int = 120) {
         self.id = UUID()
         self.name = name
         self.appTokens = appTokens

@@ -17,14 +17,13 @@ struct ProfileFormView: View {
     @State private var showAppSelection = false
     @State private var activitySelection: FamilyActivitySelection
     @State private var showDeleteConfirmation = false
-    @State private var hasDailyLimit: Bool
     @State private var dailyLimitHours: Int
     @State private var dailyLimitMinutes: Int
     let profile: Profile?
     let onDismiss: () -> Void
     
     private var isFormValid: Bool {
-        return !profileName.isEmpty && (!hasDailyLimit || (dailyLimitHours > 0 || dailyLimitMinutes > 0))
+        return !profileName.isEmpty && (dailyLimitHours > 0 || dailyLimitMinutes > 0)
     }
     
     private var hasActiveUsage: Bool {
@@ -44,11 +43,10 @@ struct ProfileFormView: View {
         selection.categoryTokens = profile?.categoryTokens ?? []
         _activitySelection = State(initialValue: selection)
         
-        // Initialize daily limit states
-        let limitMinutes = profile?.dailyLimitMinutes
-        _hasDailyLimit = State(initialValue: limitMinutes != nil && limitMinutes! > 0)
-        _dailyLimitHours = State(initialValue: (limitMinutes ?? 0) / 60)
-        _dailyLimitMinutes = State(initialValue: (limitMinutes ?? 0) % 60)
+        // Initialize daily limit states - limits are now mandatory
+        let limitMinutes = profile?.dailyLimitMinutes ?? 120 // Default to 2 hours
+        _dailyLimitHours = State(initialValue: limitMinutes / 60)
+        _dailyLimitMinutes = State(initialValue: limitMinutes % 60)
     }
     
     var body: some View {
@@ -76,9 +74,10 @@ struct ProfileFormView: View {
                     }
                 }
                 
-                Section(header: Text("Daily Limit")) {
-                    Toggle("Enable Daily Limit", isOn: $hasDailyLimit)
-                        .disabled(hasActiveUsage)
+                Section(header: Text("Daily Limit (Required)")) {
+                    Text("All profiles must have a daily usage limit.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                     
                     if hasActiveUsage {
                         Text("Daily limit cannot be changed while there is active usage. Quota can only be modified on the following day when usage resets.")
@@ -86,45 +85,43 @@ struct ProfileFormView: View {
                             .foregroundColor(.orange)
                     }
                     
-                    if hasDailyLimit {
-                        HStack {
-                            Text("Hours:")
-                            Spacer()
-                            Picker("Hours", selection: $dailyLimitHours) {
-                                ForEach(0..<24) { hour in
-                                    Text("\(hour)").tag(hour)
-                                }
+                    HStack {
+                        Text("Hours:")
+                        Spacer()
+                        Picker("Hours", selection: $dailyLimitHours) {
+                            ForEach(0..<24) { hour in
+                                Text("\(hour)").tag(hour)
                             }
-                            .pickerStyle(.wheel)
-                            .frame(width: 80, height: 100)
-                            .clipped()
-                            .disabled(hasActiveUsage)
                         }
-                        
-                        HStack {
-                            Text("Minutes:")
-                            Spacer()
-                            Picker("Minutes", selection: $dailyLimitMinutes) {
-                                ForEach(0..<60) { minute in
-                                    Text("\(minute)").tag(minute)
-                                }
-                            }
-                            .pickerStyle(.wheel)
-                            .frame(width: 80, height: 100)
-                            .clipped()
-                            .disabled(hasActiveUsage)
-                        }
-                        
-                        if dailyLimitHours == 0 && dailyLimitMinutes == 0 {
-                            Text("Please set a limit greater than 0")
-                                .font(.caption)
-                                .foregroundColor(.red)
-                        }
-                        
-                        Text("Once the daily limit is reached, you can unlock immediately but it will consume tomorrow's quota. If both quotas are exhausted, apps remain blocked until the day after tomorrow.")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                        .pickerStyle(.wheel)
+                        .frame(width: 80, height: 100)
+                        .clipped()
+                        .disabled(hasActiveUsage)
                     }
+                    
+                    HStack {
+                        Text("Minutes:")
+                        Spacer()
+                        Picker("Minutes", selection: $dailyLimitMinutes) {
+                            ForEach(0..<60) { minute in
+                                Text("\(minute)").tag(minute)
+                            }
+                        }
+                        .pickerStyle(.wheel)
+                        .frame(width: 80, height: 100)
+                        .clipped()
+                        .disabled(hasActiveUsage)
+                    }
+                    
+                    if dailyLimitHours == 0 && dailyLimitMinutes == 0 {
+                        Text("Please set a limit greater than 0")
+                            .font(.caption)
+                            .foregroundColor(.red)
+                    }
+                    
+                    Text("When Broke is activated, ALL profiles are monitored simultaneously. Once a profile's daily limit is reached, you can unlock immediately but it will consume tomorrow's quota. You'll receive notifications when usage is running out.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
                 
                 Section(header: Text("App Configuration")) {
@@ -195,15 +192,8 @@ struct ProfileFormView: View {
     }
     
     private func handleSave() {
-        // Calculate limit value: nil if no limit, otherwise total minutes
-        let limitValue: Int?
-        if hasDailyLimit {
-            let totalMinutes = dailyLimitHours * 60 + dailyLimitMinutes
-            // Validation ensures this is > 0, but be explicit
-            limitValue = totalMinutes > 0 ? totalMinutes : nil
-        } else {
-            limitValue = nil
-        }
+        // Calculate limit value - always required, must be > 0
+        let totalMinutes = dailyLimitHours * 60 + dailyLimitMinutes
         
         if let existingProfile = profile {
             profileManager.updateProfile(
@@ -212,7 +202,7 @@ struct ProfileFormView: View {
                 appTokens: activitySelection.applicationTokens,
                 categoryTokens: activitySelection.categoryTokens,
                 icon: profileIcon,
-                dailyLimitMinutes: limitValue
+                dailyLimitMinutes: totalMinutes
             )
         } else {
             let newProfile = Profile(
@@ -220,7 +210,7 @@ struct ProfileFormView: View {
                 appTokens: activitySelection.applicationTokens,
                 categoryTokens: activitySelection.categoryTokens,
                 icon: profileIcon,
-                dailyLimitMinutes: limitValue
+                dailyLimitMinutes: totalMinutes
             )
             profileManager.addProfile(newProfile: newProfile)
         }
