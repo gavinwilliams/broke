@@ -19,11 +19,17 @@ struct BrokerView: View {
     @State private var showWrongTagAlert = false
     @State private var showCreateTagAlert = false
     @State private var nfcWriteSuccess = false
+    @State private var showLimitReachedAlert = false
+    @State private var showBothQuotasExhaustedAlert = false
     
     private var isBlocking : Bool {
         get {
             return appBlocker.isBlocking
         }
+    }
+    
+    private var currentProfile: Profile {
+        profileManager.currentProfile
     }
     
     var body: some View {
@@ -63,6 +69,28 @@ struct BrokerView: View {
             } message: {
                 Text(nfcWriteSuccess ? "Broker tag created successfully!" : "Failed to create Broker tag. Please try again.")
             }
+            .alert("Daily Limit Reached", isPresented: $showLimitReachedAlert) {
+                Button("Use Tomorrow's Quota") {
+                    unlockUsingTomorrowQuota()
+                }
+                Button("Cancel", role: .cancel) { }
+            } message: {
+                Text("You've reached your daily limit of \(currentProfile.dailyLimitMinutes ?? 0) minutes. You can unblock now, but any additional time used today will consume tomorrow's quota.")
+            }
+            .alert("Both Quotas Exhausted", isPresented: $showBothQuotasExhaustedAlert) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text("You've used both today's and tomorrow's quota (\(currentProfile.usageMinutes) / \(currentProfile.dailyLimitMinutes) minutes). Apps will remain blocked until the day after tomorrow.")
+            }
+            .onAppear {
+                // Check for daily reset on app start for all profiles
+                for profile in profileManager.profiles {
+                    profileManager.checkAndResetDailyUsage(for: profile.id)
+                }
+                
+                // Restore usage tracking for ALL profiles if app was already blocking
+                appBlocker.restoreUsageTrackingIfNeeded(allProfiles: profileManager.profiles, profileManager: profileManager)
+            }
         }
         .animation(.spring(), value: isBlocking)
     }
@@ -70,7 +98,21 @@ struct BrokerView: View {
     @ViewBuilder
     private func blockOrUnblockButton(geometry: GeometryProxy) -> some View {
         VStack(spacing: 8) {
-            Text(isBlocking ? "Tap to unblock" : "Tap to block")
+            // Show usage info for current profile (all profiles are always active)
+            let limit = currentProfile.dailyLimitMinutes
+            if currentProfile.isTomorrowQuotaExhausted {
+                Text("\(currentProfile.usageMinutes) / \(limit * 2) minutes (both quotas used)")
+                    .font(.caption)
+                    .opacity(0.75)
+                    .transition(.scale)
+            } else {
+                Text("\(currentProfile.usageMinutes) / \(limit) minutes")
+                    .font(.caption)
+                    .opacity(0.75)
+                    .transition(.scale)
+            }
+            
+            Text(isBlocking ? (currentProfile.isTomorrowQuotaExhausted ? "Blocked until day after tomorrow" : (currentProfile.isLimitReached ? "Tap to use tomorrow's quota" : "Tap to unblock")) : "Tap to block all profiles")
                 .font(.caption)
                 .opacity(0.75)
                 .transition(.scale)
@@ -95,13 +137,32 @@ struct BrokerView: View {
     private func scanTag() {
         nfcReader.scan { payload in
             if payload == tagPhrase {
-                NSLog("Toggling block")
-                appBlocker.toggleBlocking(for: profileManager.currentProfile)
+                NSLog("Toggling block for ALL profiles")
+                
+                // Check if trying to unblock when current profile limit is reached
+                if appBlocker.isBlocking && currentProfile.isLimitReached {
+                    // Check if tomorrow's quota is also exhausted
+                    if currentProfile.isTomorrowQuotaExhausted {
+                        showBothQuotasExhaustedAlert = true
+                    } else if currentProfile.canUnlockUsingTomorrowQuota {
+                        showLimitReachedAlert = true
+                    }
+                } else {
+                    // Toggle blocking for ALL profiles
+                    appBlocker.toggleBlockingAllProfiles(allProfiles: profileManager.profiles, profileManager: profileManager)
+                }
             } else {
                 showWrongTagAlert = true
                 NSLog("Wrong Tag!\nPayload: \(payload)")
             }
         }
+    }
+    
+    private func unlockUsingTomorrowQuota() {
+        profileManager.unlockUsingTomorrowQuota(profileId: currentProfile.id)
+        // Now unblock ALL profiles - usage will count against tomorrow's quota for the current profile
+        appBlocker.toggleBlockingAllProfiles(allProfiles: profileManager.profiles, profileManager: profileManager)
+        NSLog("Unlocked using tomorrow's quota - additional usage will deplete tomorrow's quota")
     }
     
     private var createTagButton: some View {
