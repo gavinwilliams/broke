@@ -23,6 +23,10 @@ struct ProfileFormView: View {
     let profile: Profile?
     let onDismiss: () -> Void
     
+    private var isFormValid: Bool {
+        return !profileName.isEmpty && (!hasDailyLimit || (dailyLimitHours > 0 || dailyLimitMinutes > 0))
+    }
+    
     init(profile: Profile? = nil, profileManager: ProfileManager, onDismiss: @escaping () -> Void) {
         self.profile = profile
         self.profileManager = profileManager
@@ -146,7 +150,7 @@ struct ProfileFormView: View {
             .navigationBarItems(
                 leading: Button("Cancel", action: onDismiss),
                 trailing: Button("Save", action: handleSave)
-                    .disabled(profileName.isEmpty || (hasDailyLimit && dailyLimitHours == 0 && dailyLimitMinutes == 0))
+                    .disabled(!isFormValid)
             )
             .sheet(isPresented: $showSymbolsPicker) {
                 SymbolsPicker(selection: $profileIcon, title: "Pick an icon", autoDismiss: true)

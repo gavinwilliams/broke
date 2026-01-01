@@ -141,8 +141,9 @@ class ProfileManager: ObservableObject {
             if let icon = icon {
                 profiles[index].icon = icon
             }
-            if let limitValue = dailyLimitMinutes {
-                profiles[index].dailyLimitMinutes = limitValue
+            // Double optional: nil means "don't change", .some(nil) means "set to nil", .some(value) means "set to value"
+            if let limitUpdate = dailyLimitMinutes {
+                profiles[index].dailyLimitMinutes = limitUpdate
             }
             
             if currentProfileId == id {

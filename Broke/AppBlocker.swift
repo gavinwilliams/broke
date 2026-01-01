@@ -18,6 +18,8 @@ class AppBlocker: ObservableObject {
     private var currentProfileId: UUID?
     private var blockingStartTime: Date?
     
+    private let usageTrackingInterval: TimeInterval = 60 // Track usage every 60 seconds
+    
     init() {
         loadBlockingState()
         loadBlockingStartTime()
@@ -28,12 +30,13 @@ class AppBlocker: ObservableObject {
     
     // Call this from BrokerView's onAppear to restore usage tracking if blocking
     func restoreUsageTrackingIfNeeded(for profile: Profile, profileManager: ProfileManager) {
-        if isBlocking {
-            // Add any elapsed time since last app open
-            addElapsedUsageTime(for: profile.id, profileManager: profileManager)
-            startUsageTracking(for: profile.id, profileManager: profileManager)
-            NSLog("Restored usage tracking for profile: \(profile.name)")
-        }
+        // Only restore if blocking and timer is not already running
+        guard isBlocking, usageTimer == nil else { return }
+        
+        // Add any elapsed time since last app open
+        addElapsedUsageTime(for: profile.id, profileManager: profileManager)
+        startUsageTracking(for: profile.id, profileManager: profileManager)
+        NSLog("Restored usage tracking for profile: \(profile.name)")
     }
     
     func requestAuthorization() async {
@@ -50,14 +53,14 @@ class AppBlocker: ObservableObject {
         }
     }
     
-    func toggleBlocking(for profile: Profile, profileManager: ProfileManager, isUnlockingForNextDay: Bool = false) {
+    func toggleBlocking(for profile: Profile, profileManager: ProfileManager) {
         guard isAuthorized else {
             print("Not authorized to block apps")
             return
         }
         
         // Check if trying to unblock but limit is reached
-        if isBlocking && profile.isLimitReached && !isUnlockingForNextDay {
+        if isBlocking && profile.isLimitReached {
             NSLog("Cannot unlock - daily limit reached. Use unlock for next day instead.")
             return
         }
@@ -111,7 +114,7 @@ class AppBlocker: ObservableObject {
         currentProfileId = profileId
         
         // Track usage every minute
-        usageTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self, weak profileManager] _ in
+        usageTimer = Timer.scheduledTimer(withTimeInterval: usageTrackingInterval, repeats: true) { [weak self, weak profileManager] _ in
             guard let self = self, let profileManager = profileManager else { return }
             
             if self.isBlocking, let currentId = self.currentProfileId {
