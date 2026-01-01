@@ -211,8 +211,8 @@ class ProfileManager: ObservableObject {
         // Set last reset date to tomorrow so usage won't reset until the day after
         // Current usage continues to accumulate and will carry over as tomorrow's usage
         let calendar = Calendar.current
-        if let tomorrow = calendar.date(byAdding: .day, value: 1, to: Date()),
-           let startOfTomorrow = calendar.startOfDay(for: tomorrow) {
+        if let tomorrow = calendar.date(byAdding: .day, value: 1, to: Date()) {
+            let startOfTomorrow = calendar.startOfDay(for: tomorrow)
             profiles[index].lastResetDate = startOfTomorrow
             saveProfiles()
             NSLog("Unlocked using tomorrow's quota for profile: \(profiles[index].name). Current usage: \(profiles[index].usageMinutes) minutes will count against tomorrow.")
